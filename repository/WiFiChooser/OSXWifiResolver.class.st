@@ -8,7 +8,7 @@ Class {
 	#category : #WiFiChooser
 }
 
-{ #category : #queries }
+{ #category : #'queries - basic' }
 OSXWifiResolver class >> availableInterfaces [
 	"Fetch the list of available wireless networks"
 
@@ -28,13 +28,13 @@ Correct message: Wi-Fi Power (<each>): On"
 	^ availableInterfaces collect: [ :networkName | WiFiInterface named: networkName ]
 ]
 
-{ #category : #queries }
+{ #category : #'queries - basic' }
 OSXWifiResolver class >> availableNetworks [
 	"Fetch the list of available wireless networks"
 
 	| list availableNetworks |
 		availableNetworks := Set new.
-	self availableInterfaces do:[:interface |
+	WiFiInterface available do:[:interface |
 
 	list := (PipeableOSProcess
 		command: '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport ', interface name, ' -s') output.
@@ -42,7 +42,7 @@ OSXWifiResolver class >> availableNetworks [
 	^ availableNetworks 
 ]
 
-{ #category : #'network queries' }
+{ #category : #'queries - network' }
 OSXWifiResolver class >> connect: aNetwork [
 	^ (PipeableOSProcess
 		command:
@@ -50,17 +50,29 @@ OSXWifiResolver class >> connect: aNetwork [
 		output
 ]
 
+{ #category : #'queries - interface' }
+OSXWifiResolver class >> currentNetworkOf: anInterface [
+| tokens ssid |
+tokens :=  (PipeableOSProcess
+		command:
+			'networksetup -getairportnetwork ' , anInterface name)
+		output findTokens: Character space.
+		ssid := tokens last trimBoth.
+		^WiFiNetwork available detect: [:one | one ssid = ssid and: [ one interface = anInterface ] ] ifNone: nil
+		 
+]
+
 { #category : #private }
 OSXWifiResolver class >> isCurrent [
 	^Smalltalk platform isMacOSX
 ]
 
-{ #category : #'interface queries' }
-OSXWifiResolver class >> isUsed: anInterface [
+{ #category : #'queries - interface' }
+OSXWifiResolver class >> isPoweredOn: anInterface [
 	^(PipeableOSProcess command: 'networksetup -getairportpower ' , anInterface name) output endsWith: 'ON'
 ]
 
-{ #category : #queries }
+{ #category : #'queries - private' }
 OSXWifiResolver class >> netFromInfo: anInfoLine on: anInterface [
 	|tokens|
 	"SSID BSSID             RSSI CHANNEL HT CC SECURITY (auth/unicast/group)"
@@ -69,7 +81,7 @@ OSXWifiResolver class >> netFromInfo: anInfoLine on: anInterface [
 	^tokens first = 'SSID' ifFalse:[WiFiNetwork interface: anInterface ssid: tokens first security: tokens last]
 ]
 
-{ #category : #'interface queries' }
+{ #category : #'queries - interface' }
 OSXWifiResolver class >> niceNameOf: anInterface [
 	| allInfoReversed ix start |
 	allInfoReversed := (PipeableOSProcess command:'networksetup -listallhardwareports') output reversed. ix := allInfoReversed indexOfSubCollection: anInterface name reversed startingAt:1.
@@ -79,12 +91,12 @@ OSXWifiResolver class >> niceNameOf: anInterface [
 	^(allInfoReversed copyFrom: start +1 to: ix-1) reversed trimBoth
 ]
 
-{ #category : #'interface queries' }
-OSXWifiResolver class >> turnOff: anInterface [
+{ #category : #'queries - interface' }
+OSXWifiResolver class >> powerOff: anInterface [
 	^(PipeableOSProcess command:'networksetup -setairportpower ', anInterface name , ' off') output
 ]
 
-{ #category : #'interface queries' }
-OSXWifiResolver class >> turnOn: anInterface [
+{ #category : #'queries - interface' }
+OSXWifiResolver class >> powerOn: anInterface [
 	^(PipeableOSProcess command:'networksetup -setairportpower ', anInterface name , ' on') output
 ]

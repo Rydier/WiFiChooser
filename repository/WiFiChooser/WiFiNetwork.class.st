@@ -87,6 +87,11 @@ WiFiNetwork >> initializeSSID: anSSID security: aSecurityDescriptor password: aP
 ]
 
 { #category : #accessing }
+WiFiNetwork >> interface [
+	^interface
+]
+
+{ #category : #accessing }
 WiFiNetwork >> password [
 	^password
 ]

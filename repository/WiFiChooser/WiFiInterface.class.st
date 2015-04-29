@@ -32,6 +32,21 @@ WiFiInterface class >> refreshAvailable [
 	^Available := WiFiResolver current availableInterfaces
 ]
 
+{ #category : #comparing }
+WiFiInterface >> = anotherInterface [
+	^ self species = anotherInterface species and: [ name = anotherInterface name ]
+]
+
+{ #category : #accessing }
+WiFiInterface >> currentNetwork [
+	^WiFiResolver current currentNetworkOf: self
+]
+
+{ #category : #comparing }
+WiFiInterface >> hash [
+	^name hash
+]
+
 { #category : #'initalize-release' }
 WiFiInterface >> initializeNamed: interfaceIdentifier [
 	name := interfaceIdentifier
@@ -48,11 +63,11 @@ WiFiInterface >> niceName [
 ]
 
 { #category : #actions }
-WiFiInterface >> turnOff [
-	^WiFiResolver current turnOff: self
+WiFiInterface >> powerOff [
+	^WiFiResolver current powerOff: self
 ]
 
 { #category : #actions }
-WiFiInterface >> turnOn [
-	^WiFiResolver current turnOn: self
+WiFiInterface >> powerOn [
+	^WiFiResolver current powerOn: self
 ]
