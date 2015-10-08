@@ -14,6 +14,7 @@ Class {
 	#instVars : [
 		'interface',
 		'ssid',
+		'mac',
 		'security',
 		'password'
 	],
@@ -30,22 +31,37 @@ WiFiNetwork class >> available [
 
 { #category : #'instance creation' }
 WiFiNetwork class >> interface: anInterface ssid: anSSID [ 
-	^self interface: anInterface ssid: anSSID security: nil password: nil
+	^self interface: anInterface ssid: anSSID mac: nil security: nil password: nil
+]
+
+{ #category : #'instance creation' }
+WiFiNetwork class >> interface: anInterface ssid: anSSID mac: aMacAddress security: securityIdentifier [
+	^self interface: anInterface ssid: anSSID mac:aMacAddress security: securityIdentifier password: nil
+]
+
+{ #category : #'instance creation' }
+WiFiNetwork class >> interface: anInterface ssid: anSSID mac: aMacAddress security: securityIdentifier password: aPassword [
+	^ self new
+		initializeInterface: anInterface
+		ssid: anSSID
+		mac: aMacAddress
+		security: securityIdentifier
+		password: aPassword
 ]
 
 { #category : #'instance creation' }
 WiFiNetwork class >> interface: anInterface ssid: anSSID password: aPassword [
-	^self interface: anInterface ssid: anSSID security: nil password: aPassword
+	^self interface: anInterface ssid: anSSID mac: nil security: nil password: aPassword
 ]
 
 { #category : #'instance creation' }
 WiFiNetwork class >> interface: anInterface ssid: anSSID security: securityIdentifier [
-	^self interface: anInterface ssid: anSSID security: securityIdentifier password: nil
+	^self interface: anInterface ssid: anSSID mac: nil security: securityIdentifier password: nil
 ]
 
 { #category : #'instance creation' }
 WiFiNetwork class >> interface: anInterface ssid: anSSID security: securityIdentifier password: aPassword [
-	^self new initializeInterface:anInterface ssid: anSSID security: securityIdentifier password: aPassword
+	^self interface:anInterface ssid: anSSID mac: nil security: securityIdentifier password: aPassword
 ]
 
 { #category : #accessing }
@@ -72,16 +88,10 @@ WiFiNetwork >> hash [
 ]
 
 { #category : #'initialize - release' }
-WiFiNetwork >> initializeInterface: anInterface ssid: anSSID security: aSecurityDescriptor password: aPassword [
+WiFiNetwork >> initializeInterface: anInterface ssid: anSSID mac: aMacAddress security: aSecurityDescriptor password: aPassword [
 	interface := anInterface.
 	ssid := anSSID.
-	security := aSecurityDescriptor.
-	password := aPassword
-]
-
-{ #category : #'initialize - release' }
-WiFiNetwork >> initializeSSID: anSSID security: aSecurityDescriptor password: aPassword [
-	ssid := anSSID.
+	mac := aMacAddress.
 	security := aSecurityDescriptor.
 	password := aPassword
 ]
@@ -89,6 +99,11 @@ WiFiNetwork >> initializeSSID: anSSID security: aSecurityDescriptor password: aP
 { #category : #accessing }
 WiFiNetwork >> interface [
 	^interface
+]
+
+{ #category : #accessing }
+WiFiNetwork >> mac [
+	^mac
 ]
 
 { #category : #accessing }

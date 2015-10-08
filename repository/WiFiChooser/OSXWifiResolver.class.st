@@ -78,7 +78,7 @@ OSXWifiResolver class >> netFromInfo: anInfoLine on: anInterface [
 	"SSID BSSID             RSSI CHANNEL HT CC SECURITY (auth/unicast/group)"
 	tokens := anInfoLine trimBoth findTokens: Character space.
 	"Ugh, header"
-	^tokens first = 'SSID' ifFalse:[WiFiNetwork interface: anInterface ssid: tokens first security: tokens last]
+	^tokens first = 'SSID' ifFalse:[WiFiNetwork interface: anInterface ssid: tokens first mac: tokens second security: tokens last]
 ]
 
 { #category : #'queries - interface' }
