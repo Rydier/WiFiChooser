@@ -32,13 +32,16 @@ Correct message: Wi-Fi Power (<each>): On"
 OSXWifiResolver class >> availableNetworks [
 	"Fetch the list of available wireless networks"
 
-	| list availableNetworks |
+	| list availableNetworks offsets header |
 		availableNetworks := Set new.
 	WiFiInterface available do:[:interface |
 
-	list := (PipeableOSProcess
-		command: '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport ', interface name, ' -s') output.
-	list linesDo: [ :each | (self netFromInfo: each on: interface) ifNotNil:[:network | availableNetworks add: network] ]].
+	list := ((PipeableOSProcess
+		command: '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport ', interface name, ' -s') output) lines asOrderedCollection.
+		header := list removeFirst.
+
+	offsets := self parseOffsets:header .
+	list do: [ :each | (self netFromInfo: each offsets: offsets on: interface) ifNotNil:[:network | availableNetworks add: network] ]].
 	^ availableNetworks 
 ]
 
@@ -73,12 +76,27 @@ OSXWifiResolver class >> isPoweredOn: anInterface [
 ]
 
 { #category : #'queries - private' }
+OSXWifiResolver class >> netFromInfo: anInfoLine offsets: fieldOffsets on: anInterface [
+	|  ssid mac security |
+	"SSID BSSID RSSI CHANNEL HT CC SECURITY"
+	ssid := (anInfoLine copyFrom: (fieldOffsets at:1) to: (fieldOffsets at:2) -1) trimBoth.
+	mac := (anInfoLine copyFrom: (fieldOffsets at:2) to: (fieldOffsets at:3) -1) trimBoth.
+	mac := ByteArray readHexFrom: (mac select: [:each | each ~= $: ]).
+	security := (anInfoLine copyFrom: (fieldOffsets at:7) to: anInfoLine size) trimBoth.
+
+	^WiFiNetwork interface: anInterface ssid: ssid mac: mac security: security
+]
+
+{ #category : #'queries - private' }
 OSXWifiResolver class >> netFromInfo: anInfoLine on: anInterface [
-	|tokens|
+	| tokens |
 	"SSID BSSID             RSSI CHANNEL HT CC SECURITY (auth/unicast/group)"
 	tokens := anInfoLine trimBoth findTokens: Character space.
 	"Ugh, header"
-	^tokens first = 'SSID' ifFalse:[WiFiNetwork interface: anInterface ssid: tokens first mac: tokens second security: tokens last]
+	^tokens first = 'SSID' ifFalse:[|mac|
+		mac := ByteArray readHexFrom: (tokens second select: [:each | each ~= $: ]).
+			
+		WiFiNetwork interface: anInterface ssid: tokens first mac: mac security: tokens last]
 ]
 
 { #category : #'queries - interface' }
@@ -89,6 +107,28 @@ OSXWifiResolver class >> niceNameOf: anInterface [
 	start := allInfoReversed indexOfAnyOf: CharacterSet crlf startingAt: ix.
 	ix := allInfoReversed indexOf: $:startingAt: ix +1.
 	^(allInfoReversed copyFrom: start +1 to: ix-1) reversed trimBoth
+]
+
+{ #category : #'queries - private' }
+OSXWifiResolver class >> parseOffsets: aHeaderLine [
+	"Fields are aligned with header:
+SSID BSSID RSSI CHANNEL HT CC SECURITY
+Return offsets for each"
+
+	| offsets pastFirstItem inItem |
+	offsets := OrderedCollection with: 1.
+	pastFirstItem := false.
+	inItem := false.
+	aHeaderLine
+		withIndexDo: [ :char :index | 
+			(char ~= Character space and: [ inItem not ])
+				ifTrue: [ 
+					pastFirstItem
+						ifTrue: [ offsets add: index ]
+						ifFalse: [ pastFirstItem := true ].
+					inItem := true ].
+				(inItem and:[char = Character space]) ifTrue: [ inItem := false ] ].
+	^offsets
 ]
 
 { #category : #'queries - interface' }

@@ -116,6 +116,12 @@ WiFiNetwork >> password: aPassword [
 	password := aPassword
 ]
 
+{ #category : #printing }
+WiFiNetwork >> printOn: aStream [
+	super printOn: aStream.
+	aStream nextPutAll: '(', ssid ,')'
+]
+
 { #category : #accessing }
 WiFiNetwork >> security [
 	^security
