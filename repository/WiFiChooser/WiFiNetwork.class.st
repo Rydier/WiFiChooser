@@ -119,7 +119,7 @@ WiFiNetwork >> password: aPassword [
 { #category : #printing }
 WiFiNetwork >> printOn: aStream [
 	super printOn: aStream.
-	aStream nextPutAll: '(', ssid ,')'
+	aStream nextPutAll: '(', (ssid convertToEncoding: #utf8) ,')'
 ]
 
 { #category : #accessing }
