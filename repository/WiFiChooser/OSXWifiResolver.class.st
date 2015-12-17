@@ -38,7 +38,9 @@ OSXWifiResolver class >> availableNetworks [
 
 	list := ((PipeableOSProcess
 		command: '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport ', interface name, ' -s') output) lines asOrderedCollection.
-		header := list removeFirst.
+	list ifNotEmpty: [  
+		header := list removeFirst]
+		ifEmpty: [^self error: 'No available networks.  Is WIFI on?' ].
 
 	offsets := self parseOffsets:header .
 	list do: [ :each | (self netFromInfo: each offsets: offsets on: interface) ifNotNil:[:network | availableNetworks add: network] ]].
@@ -49,7 +51,7 @@ OSXWifiResolver class >> availableNetworks [
 OSXWifiResolver class >> connect: aNetwork [
 	^ (PipeableOSProcess
 		command:
-			'networksetup -setairportnetwork ' , aNetwork interface name , ' ' , aNetwork ssid , ' ' , aNetwork password printString)
+			'networksetup -setairportnetwork ' , aNetwork interface name , ' ' , aNetwork ssid , ' ' , aNetwork password )
 		output
 ]
 
