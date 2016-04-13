@@ -29,6 +29,11 @@ WiFiNetwork class >> available [
 	^AvailableNetworks ifNil: [self refreshAvailable]
 ]
 
+{ #category : #accessing }
+WiFiNetwork class >> availableNoRefresh [
+	^AvailableNetworks ifNil: [OrderedCollection new]
+]
+
 { #category : #'instance creation' }
 WiFiNetwork class >> interface: anInterface ssid: anSSID [ 
 	^self interface: anInterface ssid: anSSID mac: nil security: nil password: nil
