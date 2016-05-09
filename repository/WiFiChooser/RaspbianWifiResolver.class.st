@@ -30,11 +30,56 @@ RaspbianWifiResolver class >> availableInterfaces [
 { #category : #'queries - basic' }
 RaspbianWifiResolver class >> availableNetworksOn: anInterface [
 	"Fetch the list of available wireless networks on the provided interface"
-	^ (PipeableOSProcess
-		command:
-			'sudo iwlist ', anInterface name,  ' scan')
-		output
 
+	^ self parseNetworks: (PipeableOSProcess
+		command:
+			'sudo iwlist ', anInterface name,  ' scan | grep ''Address\|Quality\|SSID\|Encryption\|WPA\|Authentication ''')
+		output on: anInterface
+
+]
+
+{ #category : #'queries - network' }
+RaspbianWifiResolver class >> connect: aNetwork [
+	^(aNetwork security indexOfSubCollection: 'WPA') > 0 
+		ifTrue: [self connectWPA: aNetwork]
+		ifFalse: [self connectBasic: aNetwork] 
+]
+
+{ #category : #'queries - private' }
+RaspbianWifiResolver class >> connectWPA: aNetwork [
+	"On the Pi, WPA networks are handled using wpa_supplicant.
+	Assume all our wifi interfaces are set to be configurable using wpa_cli.
+	
+	The general flow:
+	1) Check if aNetwork is in list of managed networks, if not, add it.
+	2) Select network
+	3) Wait untill aNetwork is current, report success."
+	| connectID credentializedNetworks currentNetwork parsedNetworks setPWD enableConnect |
+	credentializedNetworks := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' list_networks') output.
+	"Don't include header"
+	parsedNetworks := credentializedNetworks lines allButFirst collect: [:each | each splitBy: Character tab asString].
+	currentNetwork := parsedNetworks detect: [:one | one last = '[CURRENT]'] ifNone: [nil].
+	"Part 1"
+	(credentializedNetworks indexOfSubCollection: aNetwork ssid) = 0 ifTrue: [ | setSSID |
+		"add network as new, fetch new id (without terminating newline)"
+		connectID := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' add_network') output allButLast.
+		"Yes, that is the proper quoting around ssid and psk, ref 
+		https://www.raspberrypi.org/forums/viewtopic.php?f=36&t=95084"
+		setSSID := (PipeableOSProcess 
+			command:'wpa_cli -i ', aNetwork interface name, ' set_network ', connectID , ' ssid ''"', aNetwork ssid , '"''')
+			output.
+		] ifFalse: [connectID := '1' ].
+	setPWD := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' set_network ', connectID , ' psk ''"', aNetwork password, '"''') output.
+
+	"Part 2"
+	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' select_network ', connectID) output.
+
+	"Part 3"
+	"Need to detect when selection fails, lookup reason, etc."
+	"Cheat for now"
+	self halt.
+	^ enableConnect
+	
 ]
 
 { #category : #'queries - basic' }
@@ -43,7 +88,7 @@ RaspbianWifiResolver class >> currentNetworkOf: anInterface [
 	|SSID MAC|	
 	SSID := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' --raw') output.
 	MAC := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' -a --raw') output.
-	anInterface availableNetworks detect: [:one | one mac = MAC ] ifNone: nil
+	^anInterface availableNetworks detect: [:one | one mac = MAC ] ifNone: nil
 ]
 
 { #category : #private }
@@ -68,6 +113,79 @@ RaspbianWifiResolver class >> niceNameOf: anInterface [
 	^self subclassResponsibility
 ]
 
+{ #category : #'queries - private' }
+RaspbianWifiResolver class >> parseNetwork: stream on: anInterface [
+	"Parse the next structure of form:
+	Cell 04 - Address: D4:D9:19:10:97:D6
+                    Quality=70/70  Signal level=-25 dBm  
+                    Encryption key:on
+                    ESSID:""veloxpro3p1""
+                    IE: IEEE 802.11i/WPA2 Version 1
+                        Authentication Suites (1) : PSK"
+	"It ain't pretty, but it gets the job done"
+	|line ix pos ssid mac encryptionOn securityIdentifier|
+	securityIdentifier := ''.
+	pos := stream position.
+	"Make sure we align with the start of a new entry"
+	[line := stream nextLine.
+	ix := line indexOfSubCollection: 'Address: ' .
+	ix = 0 and: [stream atEnd not]] whileTrue.
+	stream atEnd ifTrue: [^nil].
+	"MAC is expected as byteArray"
+	mac := ByteArray readHexFrom: ((line copyFrom: ix + 9 to: line size) select: [:each | each ~= $:]). 
+	"Read remaining properties, then reset"
+	[pos := stream position.
+	line := stream nextLine.
+	ix := line indexOfSubCollection: 'Address: ' .
+	ix = 0 and: [stream atEnd not]] whileTrue: [
+		(ix := line indexOfSubCollection: 'ESSID:') > 0 
+			ifTrue: ["Without enclosing quotes"
+				ssid := line copyFrom: ix + 7 to: line size - 1].
+		"Format on Mac: 'WPA(PSK/TKIP, AES/TKIP) WPA2(PSK/TKIP,AES/TKIP)
+		Should restructure to generate identical array of supported types, but for now we just need the
+		authentication method"
+		(ix := line indexOfSubCollection: 'Encryption key:') > 0 
+			ifTrue:	 [encryptionOn := line endsWith: 'on' ].
+		(ix := line indexOfSubCollection: 'IE: IEEE 802.11i/WPA2') > 0 
+			ifTrue: [securityIdentifier :=  securityIdentifier, 'WPA2' ].	
+		(ix := line indexOfSubCollection: 'IE: WPA Version 1') > 0 
+			ifTrue:	 [securityIdentifier := securityIdentifier,  'WPA' ].	
+		(ix := line indexOfSubCollection: 'Authentication Suites') > 0 
+			ifTrue: [securityIdentifier := securityIdentifier, '(',(line copyFrom: (line lastIndexOf: Character space) + 1  to: line size), ') '].	
+		].
+	encryptionOn 
+		ifTrue: [securityIdentifier isEmpty ifTrue: [securityIdentifier := 'WEP']]
+		ifFalse: [securityIdentifier := 'NONE'].
+	
+	stream position: pos.
+	
+	^WiFiNetwork interface: anInterface ssid: ssid mac: mac security: securityIdentifier
+	
+	
+]
+
+{ #category : #'queries - private' }
+RaspbianWifiResolver class >> parseNetworks: aString [
+|currentNetwork networks stream |
+	networks := OrderedCollection new.
+	currentNetwork := nil.
+	stream := aString readStream.
+	[((self parseNetwork: stream) ifNotNil: [:network | networks add: network]) notNil ] whileTrue.
+	^networks
+
+]
+
+{ #category : #'queries - private' }
+RaspbianWifiResolver class >> parseNetworks: aString on: anInterface [
+|currentNetwork networks stream |
+	networks := OrderedCollection new.
+	currentNetwork := nil.
+	stream := aString readStream.
+	[((self parseNetwork: stream on: anInterface) ifNotNil: [:network | networks add: network]) notNil ] whileTrue.
+	^networks
+
+]
+
 { #category : #'queries - interface' }
 RaspbianWifiResolver class >> powerOff: anInterface [
 	"To truly turn the interface off, we need to both take down the interface, and turn wifi power off"
@@ -79,4 +197,15 @@ RaspbianWifiResolver class >> powerOn: anInterface [
 	"Turn the interface on"
 	^((PipeableOSProcess command:'sudo iwconfig ', anInterface name, ' power on') output isEmpty) and: [
 	(PipeableOSProcess command:'sudo ifup --force ', anInterface name) output isEmpty]
+]
+
+{ #category : #'queries - private' }
+RaspbianWifiResolver class >> update: aNetwork with: aLine [
+	| network |
+.
+	network := aNetwork 
+		ifNil: []
+		ifNotNil: [].
+		
+	^network
 ]

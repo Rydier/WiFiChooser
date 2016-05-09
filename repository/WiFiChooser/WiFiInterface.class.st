@@ -82,3 +82,9 @@ WiFiInterface >> powerOff [
 WiFiInterface >> powerOn [
 	^WiFiResolver current powerOn: self
 ]
+
+{ #category : #printing }
+WiFiInterface >> printOn: aStream [
+	super printOn: aStream.
+	aStream nextPut: $(; nextPutAll: name; nextPut: $)
+]
