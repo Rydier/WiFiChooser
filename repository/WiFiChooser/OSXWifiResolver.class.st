@@ -29,21 +29,20 @@ Correct message: Wi-Fi Power (<each>): On"
 ]
 
 { #category : #'queries - basic' }
-OSXWifiResolver class >> availableNetworks [
-	"Fetch the list of available wireless networks"
+OSXWifiResolver class >> availableNetworksOn: anInterface [
+	"Fetch the list of available wireless networks on a given interface"
 
 	| list availableNetworks offsets header |
 		availableNetworks := Set new.
-	WiFiInterface available do:[:interface |
 
 	list := ((PipeableOSProcess
-		command: '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport ', interface name, ' -s') output) lines asOrderedCollection.
+		command: '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport ', anInterface name, ' -s') output) lines asOrderedCollection.
 	list ifNotEmpty: [  
 		header := list removeFirst]
 		ifEmpty: [^self error: 'No available networks.  Is WIFI on?' ].
 
 	offsets := self parseOffsets:header .
-	list do: [ :each | (self netFromInfo: each offsets: offsets on: interface) ifNotNil:[:network | availableNetworks add: network] ]].
+	list do: [ :each | (self netFromInfo: each offsets: offsets on: anInterface) ifNotNil:[:network | availableNetworks add: network] ].
 	^ availableNetworks 
 ]
 
@@ -55,7 +54,7 @@ OSXWifiResolver class >> connect: aNetwork [
 		output
 ]
 
-{ #category : #'queries - interface' }
+{ #category : #'queries - basic' }
 OSXWifiResolver class >> currentNetworkOf: anInterface [
 | tokens ssid |
 tokens :=  (PipeableOSProcess
@@ -69,7 +68,7 @@ tokens :=  (PipeableOSProcess
 
 { #category : #private }
 OSXWifiResolver class >> isCurrent [
-	^Smalltalk platform isMacOSX
+	^Smalltalk os platformName = 'Mac OS'
 ]
 
 { #category : #'queries - interface' }
@@ -87,18 +86,6 @@ OSXWifiResolver class >> netFromInfo: anInfoLine offsets: fieldOffsets on: anInt
 	security := (anInfoLine copyFrom: (fieldOffsets at:7) to: anInfoLine size) trimBoth.
 
 	^WiFiNetwork interface: anInterface ssid: ssid mac: mac security: security
-]
-
-{ #category : #'queries - private' }
-OSXWifiResolver class >> netFromInfo: anInfoLine on: anInterface [
-	| tokens |
-	"SSID BSSID             RSSI CHANNEL HT CC SECURITY (auth/unicast/group)"
-	tokens := anInfoLine trimBoth findTokens: Character space.
-	"Ugh, header"
-	^tokens first = 'SSID' ifFalse:[|mac|
-		mac := ByteArray readHexFrom: (tokens second select: [:each | each ~= $: ]).
-			
-		WiFiNetwork interface: anInterface ssid: tokens first mac: mac security: tokens last]
 ]
 
 { #category : #'queries - interface' }

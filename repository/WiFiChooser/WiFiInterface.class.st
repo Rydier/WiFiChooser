@@ -9,7 +9,8 @@ Class {
 	#name : #WiFiInterface,
 	#superclass : #Object,
 	#instVars : [
-		'name'
+		'name',
+		'availableNetworks'
 	],
 	#classVars : [
 		'Available'
@@ -20,6 +21,11 @@ Class {
 { #category : #accessing }
 WiFiInterface class >> available [
 	^Available ifNil: [ self refreshAvailable ]
+]
+
+{ #category : #accessing }
+WiFiInterface class >> availableNetworks [
+	^WiFiResolver current availableNetworksOn: self
 ]
 
 { #category : #'instance creation' }
@@ -35,6 +41,11 @@ WiFiInterface class >> refreshAvailable [
 { #category : #comparing }
 WiFiInterface >> = anotherInterface [
 	^ self species = anotherInterface species and: [ name = anotherInterface name ]
+]
+
+{ #category : #accessing }
+WiFiInterface >> availableNetworks [
+	^WiFiResolver current availableNetworksOn: self
 ]
 
 { #category : #accessing }

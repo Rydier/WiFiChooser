@@ -23,8 +23,18 @@ WiFiResolver class >> availableInterfaces [
 
 { #category : #'queries - basic' }
 WiFiResolver class >> availableNetworks [
-	"WiFiResolver current availableNetworks"
-	^self subclassResponsibility
+	"Fetch the list of available wireless networks"
+
+	^WiFiInterface available 
+		inject: Set new 
+		into: [:sub :interface |
+			sub addAll: (self availableNetworksOn: interface); yourself].
+]
+
+{ #category : #'queries - interface' }
+WiFiResolver class >> availableNetworksOn: anInterface [
+	"Fetch the list of available wireless networks on the provided interface"
+		^self subclassResponsibility
 ]
 
 { #category : #'queries - network' }
