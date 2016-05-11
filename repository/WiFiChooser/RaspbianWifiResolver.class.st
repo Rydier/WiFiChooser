@@ -30,18 +30,28 @@ RaspbianWifiResolver class >> availableInterfaces [
 { #category : #'queries - basic' }
 RaspbianWifiResolver class >> availableNetworksOn: anInterface [
 	"Fetch the list of available wireless networks on the provided interface"
-
-	^ self parseNetworks: (PipeableOSProcess
+	|output retries success|
+	retries := 10.
+	success := false.
+	[output := (PipeableOSProcess
 		command:
-			'sudo iwlist ', anInterface name,  ' scan | grep ''Address\|Quality\|SSID\|Encryption\|WPA\|Authentication ''')
-		output on: anInterface
+			'sudo iwlist ', anInterface name,  ' scan | grep ''Address\|Quality\|SSID\|Encryption\|WPA\|Authentication\|Device ''')
+		output.
+	 retries > 0 and: [success := (output indexOfSubCollection: 'Device or resource busy') > 0]] whileTrue: [0.5 seconds wait].
+	success ifFalse: [^self error: 'Interface unavailable'].
+	
+	^ self parseNetworks: output on: anInterface
 
 ]
 
 { #category : #'queries - network' }
 RaspbianWifiResolver class >> connect: aNetwork [
 	^(aNetwork security indexOfSubCollection: 'WPA') > 0 
-		ifTrue: [self connectWPA: aNetwork]
+		ifTrue: [(aNetwork security indexOfSubCollection: '802.1x') > 0
+			ifTrue:[^UnsupportedEncryption new 
+						messageText: 'Does not know how to connect to Enterprise WPA networks'; 
+						signal].
+			self connectWPA: aNetwork]
 		ifFalse: [self connectBasic: aNetwork] 
 ]
 
@@ -179,6 +189,7 @@ RaspbianWifiResolver class >> parseNetworks: aString [
 RaspbianWifiResolver class >> parseNetworks: aString on: anInterface [
 |currentNetwork networks stream |
 	networks := OrderedCollection new.
+
 	currentNetwork := nil.
 	stream := aString readStream.
 	[((self parseNetwork: stream on: anInterface) ifNotNil: [:network | networks add: network]) notNil ] whileTrue.
