@@ -108,7 +108,7 @@ RaspbianWifiResolver class >> connectedTo: aNetwork within: aTimeLimit [
 	connected := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' status') output.
 	
 	success := (connected indexOfSubCollection: aNetwork ssid) > 0 
-		    and: [(connected indexOfSubCollection: 'wpa_state=CONNECTED') > 0].
+		    and: [(connected indexOfSubCollection: 'wpa_state=COMPLETED') > 0].
 	success not and: [DateAndTime now < timeout ]] whileTrue: [
 	seenStatuses add: connected].
 	answered := DateAndTime now.
