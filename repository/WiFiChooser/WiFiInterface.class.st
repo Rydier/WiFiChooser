@@ -63,6 +63,11 @@ WiFiInterface >> initializeNamed: interfaceIdentifier [
 	name := interfaceIdentifier
 ]
 
+{ #category : #actions }
+WiFiInterface >> isPoweredOn [
+	^WiFiResolver current isPoweredOn: self
+]
+
 { #category : #accessing }
 WiFiInterface >> name [
 	^name

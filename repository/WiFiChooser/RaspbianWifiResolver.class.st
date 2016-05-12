@@ -37,7 +37,8 @@ RaspbianWifiResolver class >> availableNetworksOn: anInterface [
 		command:
 			'sudo iwlist ', anInterface name,  ' scan | grep ''Address\|Quality\|SSID\|Encryption\|WPA\|Authentication\|Device ''')
 		output.
-	 retries > 0 and: [success := (output indexOfSubCollection: 'Device or resource busy') > 0]] whileTrue: [0.5 seconds wait].
+	 retries > 0 and: [(success := (output indexOfSubCollection: 'Device or resource busy') = 0) not]] whileTrue: [0.5 seconds wait.
+	retries := retries - 1].
 	success ifFalse: [^self error: 'Interface unavailable'].
 	
 	^ self parseNetworks: output on: anInterface
@@ -46,13 +47,14 @@ RaspbianWifiResolver class >> availableNetworksOn: anInterface [
 
 { #category : #'queries - network' }
 RaspbianWifiResolver class >> connect: aNetwork [
-	^(aNetwork security indexOfSubCollection: 'WPA') > 0 
-		ifTrue: [(aNetwork security indexOfSubCollection: '802.1x') > 0
-			ifTrue:[^UnsupportedEncryption new 
+	aNetwork security ifNotNil: [:sec | 
+		(sec indexOfSubCollection: 'WPA') > 0 
+			ifTrue: [(sec indexOfSubCollection: '802.1x') > 0
+				ifTrue:[^UnsupportedEncryption new 
 						messageText: 'Does not know how to connect to Enterprise WPA networks'; 
-						signal].
-			self connectWPA: aNetwork]
-		ifFalse: [self connectBasic: aNetwork] 
+						signal]]].
+	^self connectWPA: aNetwork
+		"ifFalse: [self connectBasic: aNetwork] "
 ]
 
 { #category : #'queries - private' }
@@ -78,27 +80,55 @@ RaspbianWifiResolver class >> connectWPA: aNetwork [
 		setSSID := (PipeableOSProcess 
 			command:'wpa_cli -i ', aNetwork interface name, ' set_network ', connectID , ' ssid ''"', aNetwork ssid , '"''')
 			output.
-		] ifFalse: [connectID := '1' ].
+		] ifFalse: [connectID := (parsedNetworks detect: [:one | one second = aNetwork ssid]) first ].
 	setPWD := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' set_network ', connectID , ' psk ''"', aNetwork password, '"''') output.
 
 	"Part 2"
 	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' select_network ', connectID) output.
+	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' disable_network ', connectID) output.
+	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' enable_network ', connectID) output.
 
 	"Part 3"
 	"Need to detect when selection fails, lookup reason, etc."
 	"Cheat for now"
-	self halt.
-	^ enableConnect
+	^self connectedTo: aNetwork within: 5 seconds.
 	
+	
+]
+
+{ #category : #'queries - private' }
+RaspbianWifiResolver class >> connectedTo: aNetwork within: aTimeLimit [
+	|timeout success seenStatuses answered connected |
+	success := false.
+	seenStatuses := OrderedCollection new.
+	timeout  := DateAndTime now + aTimeLimit.
+
+	[
+	50 milliSeconds wait.
+	connected := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' status') output.
+	
+	success := (connected indexOfSubCollection: aNetwork ssid) > 0 
+		    and: [(connected indexOfSubCollection: 'wpa_state=CONNECTED') > 0].
+	success not and: [DateAndTime now < timeout ]] whileTrue: [
+	seenStatuses add: connected].
+	answered := DateAndTime now.
+success ifFalse: ["If we at least tried to connect, credentials were probably wrong"
+	(seenStatuses includes: [: one | 
+		(one indexOfSubCollection: 'wpa_state=4WAY_HANDSHAKE') > 0])
+			ifTrue: [IncorrectCredentials new signal]
+			ifFalse: [NetworkUnavailable new signal]].
+	^success
 ]
 
 { #category : #'queries - basic' }
 RaspbianWifiResolver class >> currentNetworkOf: anInterface [
 	"The network anInterface currently connects to"
-	|SSID MAC|	
-	SSID := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' --raw') output.
-	MAC := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' -a --raw') output.
-	^anInterface availableNetworks detect: [:one | one mac = MAC ] ifNone: nil
+	|SSID|	
+	SSID := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' --raw') output trim.
+	^SSID isEmpty ifFalse: [ |MAC|
+		MAC := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' -a --raw') output.
+		MAC := ByteArray readHexFrom: (MAC trim select: [:each | each ~= $: ]).
+		WiFiNetwork interface: anInterface ssid: SSID mac: MAC]
 ]
 
 { #category : #private }
@@ -137,17 +167,18 @@ RaspbianWifiResolver class >> parseNetwork: stream on: anInterface [
 	securityIdentifier := ''.
 	pos := stream position.
 	"Make sure we align with the start of a new entry"
-	[line := stream nextLine.
+	[stream atEnd ifTrue: [^nil].
+	line := stream nextLine.
 	ix := line indexOfSubCollection: 'Address: ' .
 	ix = 0 and: [stream atEnd not]] whileTrue.
-	stream atEnd ifTrue: [^nil].
+	
 	"MAC is expected as byteArray"
 	mac := ByteArray readHexFrom: ((line copyFrom: ix + 9 to: line size) select: [:each | each ~= $:]). 
 	"Read remaining properties, then reset"
 	[pos := stream position.
 	line := stream nextLine.
-	ix := line indexOfSubCollection: 'Address: ' .
-	ix = 0 and: [stream atEnd not]] whileTrue: [
+	line notNil and: [ix := line indexOfSubCollection: 'Address: ' .
+	ix = 0 ]] whileTrue: [
 		(ix := line indexOfSubCollection: 'ESSID:') > 0 
 			ifTrue: ["Without enclosing quotes"
 				ssid := line copyFrom: ix + 7 to: line size - 1].
@@ -167,8 +198,9 @@ RaspbianWifiResolver class >> parseNetwork: stream on: anInterface [
 		ifTrue: [securityIdentifier isEmpty ifTrue: [securityIdentifier := 'WEP']]
 		ifFalse: [securityIdentifier := 'NONE'].
 	
-	stream position: pos.
-	
+	(stream atEnd) ifFalse: [
+		stream position: pos].
+		
 	^WiFiNetwork interface: anInterface ssid: ssid mac: mac security: securityIdentifier
 	
 	
@@ -206,8 +238,8 @@ RaspbianWifiResolver class >> powerOff: anInterface [
 { #category : #'queries - interface' }
 RaspbianWifiResolver class >> powerOn: anInterface [
 	"Turn the interface on"
-	^((PipeableOSProcess command:'sudo iwconfig ', anInterface name, ' power on') output isEmpty) and: [
-	(PipeableOSProcess command:'sudo ifup --force ', anInterface name) output isEmpty]
+	^((PipeableOSProcess command:'sudo iwconfig ', anInterface name, ' power on') output isEmpty) "and: [
+	(PipeableOSProcess command:'sudo ifup --force ', anInterface name) output isEmpty]"
 ]
 
 { #category : #'queries - private' }

@@ -40,6 +40,11 @@ WiFiNetwork class >> interface: anInterface ssid: anSSID [
 ]
 
 { #category : #'instance creation' }
+WiFiNetwork class >> interface: anInterface ssid: anSSID mac: aMAC [
+	^self interface: anInterface ssid: anSSID mac: aMAC security: nil password: nil
+]
+
+{ #category : #'instance creation' }
 WiFiNetwork class >> interface: anInterface ssid: anSSID mac: aMacAddress security: securityIdentifier [
 	^self interface: anInterface ssid: anSSID mac:aMacAddress security: securityIdentifier password: nil
 ]
