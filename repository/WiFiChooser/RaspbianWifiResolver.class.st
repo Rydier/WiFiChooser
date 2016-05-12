@@ -66,11 +66,10 @@ RaspbianWifiResolver class >> connectWPA: aNetwork [
 	1) Check if aNetwork is in list of managed networks, if not, add it.
 	2) Select network
 	3) Wait untill aNetwork is current, report success."
-	| connectID credentializedNetworks currentNetwork parsedNetworks setPWD enableConnect |
+	| connectID credentializedNetworks  parsedNetworks setPWD enableConnect |
 	credentializedNetworks := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' list_networks') output.
 	"Don't include header"
 	parsedNetworks := credentializedNetworks lines allButFirst collect: [:each | each splitBy: Character tab asString].
-	currentNetwork := parsedNetworks detect: [:one | one last = '[CURRENT]'] ifNone: [nil].
 	"Part 1"
 	(credentializedNetworks indexOfSubCollection: aNetwork ssid) = 0 ifTrue: [ | setSSID |
 		"add network as new, fetch new id (without terminating newline)"
@@ -113,6 +112,7 @@ RaspbianWifiResolver class >> connectedTo: aNetwork within: aTimeLimit [
 	seenStatuses add: connected].
 	answered := DateAndTime now.
 success ifFalse: ["If we at least tried to connect, credentials were probably wrong"
+
 	(seenStatuses includes: [: one | 
 		(one indexOfSubCollection: 'wpa_state=4WAY_HANDSHAKE') > 0])
 			ifTrue: [IncorrectCredentials new signal]
@@ -123,12 +123,16 @@ success ifFalse: ["If we at least tried to connect, credentials were probably wr
 { #category : #'queries - basic' }
 RaspbianWifiResolver class >> currentNetworkOf: anInterface [
 	"The network anInterface currently connects to"
-	|SSID|	
-	SSID := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' --raw') output trim.
-	^SSID isEmpty ifFalse: [ |MAC|
-		MAC := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' -a --raw') output.
-		MAC := ByteArray readHexFrom: (MAC trim select: [:each | each ~= $: ]).
-		WiFiNetwork interface: anInterface ssid: SSID mac: MAC]
+	|state|
+		"iwgetid lies, only indicates which network we _wish_ we were connected to"
+	state := (PipeableOSProcess command:'sudo wpa_cli -i', anInterface name, ' status  | grep wpa_state') output trim.
+	self halt.
+	^(state indexOfSubCollection: 'COMPLETED') > 0 ifTrue: [|SSID|	
+		SSID := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' --raw') output trim.
+		SSID isEmpty ifFalse: [ |MAC|
+			MAC := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' -a --raw') output.
+			MAC := ByteArray readHexFrom: (MAC trim select: [:each | each ~= $: ]).
+			WiFiNetwork interface: anInterface ssid: SSID mac: MAC]]
 ]
 
 { #category : #private }
