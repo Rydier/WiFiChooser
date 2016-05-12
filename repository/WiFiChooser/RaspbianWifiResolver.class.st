@@ -111,9 +111,11 @@ RaspbianWifiResolver class >> connectedTo: aNetwork within: aTimeLimit [
 	success not and: [DateAndTime now < timeout ]] whileTrue: [
 	seenStatuses add: connected].
 	answered := DateAndTime now.
+	
 success ifFalse: ["If we at least tried to connect, credentials were probably wrong"
 
-	(seenStatuses includes: [: one | 
+	(seenStatuses contains: [: one | 
+	
 		(one indexOfSubCollection: 'wpa_state=4WAY_HANDSHAKE') > 0])
 			ifTrue: [IncorrectCredentials new signal]
 			ifFalse: [NetworkUnavailable new signal]].
