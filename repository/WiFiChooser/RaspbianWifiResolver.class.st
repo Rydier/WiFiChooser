@@ -126,7 +126,6 @@ RaspbianWifiResolver class >> currentNetworkOf: anInterface [
 	|state|
 		"iwgetid lies, only indicates which network we _wish_ we were connected to"
 	state := (PipeableOSProcess command:'sudo wpa_cli -i', anInterface name, ' status  | grep wpa_state') output trim.
-	self halt.
 	^(state indexOfSubCollection: 'COMPLETED') > 0 ifTrue: [|SSID|	
 		SSID := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' --raw') output trim.
 		SSID isEmpty ifFalse: [ |MAC|
