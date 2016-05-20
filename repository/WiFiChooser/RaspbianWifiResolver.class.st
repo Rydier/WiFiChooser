@@ -67,6 +67,7 @@ RaspbianWifiResolver class >> connectWPA: aNetwork [
 	2) Select network
 	3) Wait untill aNetwork is current, report success."
 	| connectID credentializedNetworks  parsedNetworks setPWD enableConnect |
+
 	credentializedNetworks := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' list_networks') output.
 	"Don't include header"
 	parsedNetworks := credentializedNetworks lines allButFirst collect: [:each | each splitBy: Character tab asString].
@@ -84,8 +85,8 @@ RaspbianWifiResolver class >> connectWPA: aNetwork [
 
 	"Part 2"
 	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' select_network ', connectID) output.
-	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' disable_network ', connectID) output.
-	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' enable_network ', connectID) output.
+"	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' disable_network ', connectID) output.
+	enableConnect := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' enable_network ', connectID) output."
 
 	"Part 3"
 	"Need to detect when selection fails, lookup reason, etc."
@@ -126,7 +127,8 @@ success ifFalse: ["If we at least tried to connect, credentials were probably wr
 RaspbianWifiResolver class >> currentNetworkOf: anInterface [
 	"The network anInterface currently connects to"
 	|state|
-		"iwgetid lies, only indicates which network we _wish_ we were connected to"
+	"iwgetid lies, only indicates which network we _wish_ we were connected to.
+	Ask if our status is that that we are actually connected first."
 	state := (PipeableOSProcess command:'sudo wpa_cli -i', anInterface name, ' status  | grep wpa_state') output trim.
 	^(state indexOfSubCollection: 'COMPLETED') > 0 ifTrue: [|SSID|	
 		SSID := (PipeableOSProcess command:'sudo iwgetid ', anInterface name, ' --raw') output trim.
@@ -243,6 +245,7 @@ RaspbianWifiResolver class >> powerOff: anInterface [
 { #category : #'queries - interface' }
 RaspbianWifiResolver class >> powerOn: anInterface [
 	"Turn the interface on"
+	self halt. "Incorrect, turns power MANAGEMENT on, not what we want. Avoid use for now"
 	^((PipeableOSProcess command:'sudo iwconfig ', anInterface name, ' power on') output isEmpty) "and: [
 	(PipeableOSProcess command:'sudo ifup --force ', anInterface name) output isEmpty]"
 ]
