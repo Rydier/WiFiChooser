@@ -67,20 +67,20 @@ RaspbianWifiResolver class >> connectWPA: aNetwork [
 	2) Select network
 	3) Wait untill aNetwork is current, report success."
 	| connectID credentializedNetworks  parsedNetworks setPWD enableConnect |
-
 	credentializedNetworks := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' list_networks') output.
 	"Don't include header"
 	parsedNetworks := credentializedNetworks lines allButFirst collect: [:each | each splitBy: Character tab asString].
 	"Part 1"
-	(credentializedNetworks indexOfSubCollection: aNetwork ssid) = 0 ifTrue: [ | setSSID |
+	connectID := (parsedNetworks detect: [: one | one second = aNetwork ssid ] ifNone: [ | newID setSSID |
 		"add network as new, fetch new id (without terminating newline)"
-		connectID := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' add_network') output allButLast.
+		newID := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' add_network') output allButLast.
 		"Yes, that is the proper quoting around ssid and psk, ref 
 		https://www.raspberrypi.org/forums/viewtopic.php?f=36&t=95084"
 		setSSID := (PipeableOSProcess 
-			command:'wpa_cli -i ', aNetwork interface name, ' set_network ', connectID , ' ssid ''"', aNetwork ssid , '"''')
+			command:'wpa_cli -i ', aNetwork interface name, ' set_network ', newID , ' ssid ''"', aNetwork ssid , '"''')
 			output.
-		] ifFalse: [connectID := (parsedNetworks detect: [:one | one second = aNetwork ssid]) first ].
+		Array with: newID with: aNetwork ssid	
+		]) first.
 	setPWD := (PipeableOSProcess command: 'wpa_cli -i ', aNetwork interface name, ' set_network ', connectID , ' psk ''"', aNetwork password, '"''') output.
 
 	"Part 2"
