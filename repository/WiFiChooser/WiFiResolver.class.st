@@ -56,6 +56,11 @@ WiFiResolver class >> currentNetworkOf: anInterface [
 	^self subclassResponsibility
 ]
 
+{ #category : #'queries - network' }
+WiFiResolver class >> disconnect: aNetwork [
+	^self subclassResponsibility
+]
+
 { #category : #private }
 WiFiResolver class >> isCurrent [
 	^self subclassResponsibility

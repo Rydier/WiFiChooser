@@ -138,6 +138,21 @@ RaspbianWifiResolver class >> currentNetworkOf: anInterface [
 			WiFiNetwork interface: anInterface ssid: SSID mac: MAC]]
 ]
 
+{ #category : #'queries - network' }
+RaspbianWifiResolver class >> disconnect: aNetwork [
+	| connectID credentializedNetworks  parsedNetworks disableSSID |
+	credentializedNetworks := (PipeableOSProcess command:'wpa_cli -i ', aNetwork interface name, ' list_networks') output.
+	"Don't include header"
+	parsedNetworks := credentializedNetworks lines allButFirst collect: [:each | each splitBy: Character tab asString].
+	
+	connectID := parsedNetworks detect: [: one | one second = aNetwork ssid ] ifNone: ["The interface doesn't know aNetwork, nothing to disconnect" ^nil].
+	disableSSID := (PipeableOSProcess 
+			command:'wpa_cli -i ', aNetwork interface name, ' disable_network ', connectID first)
+			output.
+	
+	
+]
+
 { #category : #private }
 RaspbianWifiResolver class >> isCurrent [
 	"This is the platform name currently returned by Squeak on Raspbian"

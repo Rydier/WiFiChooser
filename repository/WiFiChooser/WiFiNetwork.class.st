@@ -92,6 +92,13 @@ WiFiNetwork >> connect [
 	^WiFiResolver current connect: self
 ]
 
+{ #category : #actions }
+WiFiNetwork >> disconnect [
+	ssid ifNil: [ ^nil "Cannot disconnect a network without SSID" ].
+	interface ifNil:[^nil "Must know which interface this network should no longer be connected through..."].
+	^WiFiResolver current disconnect: self
+]
+
 { #category : #comparing }
 WiFiNetwork >> hash [
 	^self ssid hash
