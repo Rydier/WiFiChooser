@@ -4,9 +4,19 @@ Before connecting, my SSID, an the interface through which I am available,  must
 If I require a password to connect to, that has to be set as well.
 
 There are two main usages when connecting;, depending on whether SSID is hidden or not: 
-1) Pick the network with desired SSID from the WiFiNetwork available list, and modify as necessary (adding passwords etc.), then connect.
-
-2) Resolve the active interface (WiFiInterface available), and create a WiFiNetwork instace on that  with the correct using one of the instance creation methods to pass along the correct SSID/password.
+1) Connect to a network with public SSID that is in the discovered list
+	a) Pick the network with desired SSID from the WiFiNetwork available list, 
+		modify as necessary, then connect.
+	(WiFiNetwork availableNetworks detect: [ :one | one ssid = 'MyNetwork' ]) 
+		password: 'MyPass'; 
+		connect.
+	b) Use the shorthand, and connect with a temporarily set password.
+	(WiFiNetwork named: 'MyNetwork') connectUsingPassword: 'MyPass'.
+2) Connect to a network with private SSID that is *not* in the discovered list
+	- Resolve the interface to use, and create a WiFiNetwork instance on that interface with the correct using one of the instance creation methods to pass along the correct SSID/password.
+	 (WiFiNetwork 
+		interface: WiFiInterface available first
+		ssid: 'MyNetwork') connectUsingPassword: 'MyPass'
 "
 Class {
 	#name : #WiFiNetwork,
@@ -74,6 +84,12 @@ WiFiNetwork class >> interface: anInterface ssid: anSSID security: securityIdent
 	^self interface:anInterface ssid: anSSID mac: nil security: securityIdentifier password: aPassword
 ]
 
+{ #category : #'instance creation' }
+WiFiNetwork class >> named: anSSID [
+	"Return a network with the given SSID, if available" 
+	^self available detect: [ :one | one ssid = anSSID ] ifNone: [ nil ]
+]
+
 { #category : #accessing }
 WiFiNetwork class >> refreshAvailable [
 	^AvailableNetworks := WiFiResolver current availableNetworks
@@ -90,6 +106,17 @@ WiFiNetwork >> connect [
 	ssid ifNil: [ ^self error: 'Cannot connect a network without SSID' ].
 	interface ifNil:[^self error: 'Network interface to use must be resolved before connecting'].
 	^WiFiResolver current connect: self
+]
+
+{ #category : #actions }
+WiFiNetwork >> connectUsingPassword: aPassword [
+	|storedPassword|
+	ssid ifNil: [ ^self error: 'Cannot connect a network without SSID' ].
+	interface ifNil:[^self error: 'Network interface to use must be resolved before connecting'].
+	storedPassword := password.	
+	[password := aPassword. 	
+	WiFiResolver current connect: self] 
+		ensure: [ password := storedPassword ]
 ]
 
 { #category : #actions }
