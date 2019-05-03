@@ -1,5 +1,6 @@
 # WiFiChooser
 Code to control WiFi interface from Pharo/Squeak
+Implemented for Raspbian / OSX, using command line tools and OSProcess.
 
 To load:
 ```smalltalk
@@ -9,7 +10,22 @@ Metacello new
 	load.
 ```
 
-Implemented for Raspbian / OSX, using command line tools and OSProcess.
-Currently borken on latest version of OSX; since High Sierra removed the command we were using...
+To list available WiFi interfaces:
+```smalltalk
+WiFiInterface available.
+```
+To list discovered WiFi networks:
+```smalltalk
+"Networks discovered on all interfaces (cached)"
+WiFiNetwork available.
+"Networks discovered on all interfaces (refreshed)"
+WiFiNetwork refreshAvailable.
+```
+To connect to a discovered network using tmp password:
+```smalltalk
+(WiFiNetwork named: 'MySSID') connectUsingPassword: 'MyPassword'.
+```
+
+For more details and example usages, see class comments.
 
 Migrated from Monticello using https://github.com/peteruhnak/git-migration
