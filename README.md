@@ -6,8 +6,8 @@ Implemented for Raspbian / OSX, using command line tools and OSProcess.
 To load:
 ```smalltalk
 Metacello new
-	baseline: 'SSDP';
-	repository: 'github://rydier/SSDP/repository';
+	baseline: 'WiFiChooser';
+	repository: 'github://rydier/WiFiChooser/repository';
 	load.
 ```
 
